@@ -1,0 +1,19 @@
+{
+  "name": "plaruer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A small 2D colony game for Android",
+  "scripts": {
+    "build": "node scripts/build-web.mjs",
+    "android:sync": "npm run build && cap sync android",
+    "android:open": "cap open android",
+    "android:debug": "npm run android:sync && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.5.2",
+    "@capacitor/core": "8.5.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.5.2"
+  }
+}
