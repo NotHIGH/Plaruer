@@ -3,355 +3,177 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#1e2d26">
-  <title>Plaruer — Outpost</title>
+  <meta name="theme-color" content="#202425">
+  <title>Plaruer — Ashfall</title>
   <style>
     :root {
       color-scheme: dark;
-      --ink: #f4efd9;
-      --muted: #b8b79e;
-      --panel: rgba(29, 40, 34, .88);
-      --line: rgba(225, 219, 186, .18);
-      --lime: #c1d27d;
+      --paper: #e1e4df;
+      --dim: #a5aaa7;
+      --panel: rgba(27, 30, 31, .88);
+      --edge: rgba(225, 230, 226, .22);
+      --accent: #bec5c1;
     }
     * { box-sizing: border-box; }
     html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
     body {
-      background: #293b2b;
-      color: var(--ink);
+      background: #626666;
+      color: var(--paper);
       font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       user-select: none;
       -webkit-user-select: none;
       touch-action: none;
     }
-    #world { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
-    .topbar {
-      position: fixed; z-index: 2; top: max(18px, env(safe-area-inset-top)); left: 20px;
-      display: flex; align-items: stretch; gap: 10px; pointer-events: none;
+    #world, #effects, #fog-fallback { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+    #world { z-index: 0; }
+    #effects { z-index: 1; pointer-events: none; }
+    #fog-fallback { z-index: 1; display: none; pointer-events: none; background: radial-gradient(ellipse at 50% 47%, transparent 15%, #c4c8c644 100%), linear-gradient(0deg, #c5c9c733, transparent 70%); }
+    body.no-webgl #world { filter: grayscale(1) contrast(.9); }
+    body.no-webgl #effects { display: none; }
+    body.no-webgl #fog-fallback { display: block; }
+    button { color: inherit; font: inherit; }
+    .corner-count, .inventory-toggle, .inventory, .hotbar-slot, .attack, .joystick {
+      border: 1px solid var(--edge);
+      background: var(--panel);
+      box-shadow: 0 8px 28px #10131466;
+      backdrop-filter: blur(10px);
     }
-    .brand, .readout, .corner, .joystick {
-      border: 1px solid var(--line); background: var(--panel);
-      box-shadow: 0 12px 32px rgba(12, 19, 14, .22); backdrop-filter: blur(12px);
+    .corner-count {
+      position: fixed; z-index: 3; top: max(16px, env(safe-area-inset-top)); left: 18px;
+      padding: 8px 11px; border-radius: 4px; color: var(--dim);
+      font: 10px "Courier New", monospace; letter-spacing: 1px; pointer-events: none;
     }
-    .brand { min-width: 188px; padding: 12px 16px 11px; border-radius: 5px; }
-    .eyebrow, .label, .coordinates, .tag {
-      font-family: "Courier New", monospace; text-transform: uppercase; letter-spacing: 1.1px;
+    .corner-count strong { color: var(--paper); font-size: 12px; font-weight: 400; }
+    .inventory-toggle {
+      position: fixed; z-index: 4; top: max(14px, env(safe-area-inset-top)); right: 16px;
+      width: 42px; height: 42px; border-radius: 4px; cursor: pointer; font-size: 21px;
     }
-    .eyebrow { color: var(--lime); font-size: 9px; }
-    h1 { margin: 4px 0 0; font: 600 21px/1 Georgia, serif; letter-spacing: 0; }
-    .readout { min-width: 142px; padding: 11px 14px; border-radius: 5px; }
-    .label { color: var(--muted); font-size: 9px; }
-    .value { display: flex; align-items: center; gap: 7px; margin-top: 7px; font-size: 12px; }
-    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 10px #c1d27d88; }
-    .corner {
-      position: fixed; z-index: 2; top: max(18px, env(safe-area-inset-top)); right: 20px;
-      padding: 10px 13px; border-radius: 5px; text-align: right; pointer-events: none;
+    .inventory-toggle:hover, .attack:hover { border-color: #e6ebe7a0; background: #3b4040e8; }
+    .inventory {
+      position: fixed; z-index: 5; top: 50%; left: 50%; width: min(304px, calc(100vw - 32px));
+      padding: 13px; border-radius: 5px; transform: translate(-50%, -50%);
     }
-    .coordinates { color: var(--muted); font-size: 10px; }
-    .biome { margin-top: 5px; font: 15px Georgia, serif; }
-    .bottom-note {
-      position: fixed; z-index: 2; right: 22px; bottom: max(20px, env(safe-area-inset-bottom));
-      padding: 8px 10px; color: #f4efd9cc; background: rgba(29,40,34,.68);
-      border: 1px solid var(--line); border-radius: 4px; font: 10px "Courier New", monospace;
-      pointer-events: none;
+    .inventory[hidden] { display: none; }
+    .inventory-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .inventory-title { color: var(--dim); font: 10px "Courier New", monospace; letter-spacing: 1.3px; }
+    .inventory-close { width: 30px; height: 30px; border: 0; background: transparent; color: var(--dim); font-size: 22px; cursor: pointer; }
+    .inventory-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .inventory-slot {
+      aspect-ratio: 1; display: grid; place-items: center; position: relative;
+      border: 1px solid #d5d9d433; border-radius: 3px; background: #11151666; cursor: pointer;
     }
+    .inventory-slot.selected { border-color: #d9dfdcaa; background: #aeb5b522; }
+    .item-icon { color: #d8ddda; font-size: 25px; line-height: 1; }
+    .inventory-empty { color: #aab0ad50; font-size: 18px; }
+    .inventory-foot { margin-top: 11px; color: #9ba19e; font: 9px "Courier New", monospace; letter-spacing: .6px; }
+    .controls { position: fixed; z-index: 3; inset: 0; pointer-events: none; }
     .joystick-wrap {
-      position: fixed; z-index: 3; left: max(24px, env(safe-area-inset-left));
-      bottom: max(24px, env(safe-area-inset-bottom)); width: 150px; height: 150px;
-      display: grid; place-items: center; touch-action: none;
+      position: absolute; left: max(22px, env(safe-area-inset-left)); bottom: max(22px, env(safe-area-inset-bottom));
+      width: 138px; height: 138px; display: grid; place-items: center; pointer-events: auto;
     }
     .joystick {
-      position: relative; width: 136px; height: 136px; border-radius: 50%;
-      background: radial-gradient(circle at 48% 43%, rgba(112,137,93,.25), rgba(26,39,31,.82) 70%);
-      border-color: rgba(232,225,191,.25); touch-action: none;
+      position: relative; width: 126px; height: 126px; border-radius: 50%;
+      background: radial-gradient(circle at 50% 45%, #777e7b40, #161a1bdd 74%);
+      border-color: #d5dbd54a; touch-action: none;
     }
     .joystick::before, .joystick::after {
-      content: ""; position: absolute; inset: 15px; border: 1px solid rgba(232,225,191,.12); border-radius: 50%;
+      content: ""; position: absolute; inset: 14px; border: 1px solid #dbe0dc22; border-radius: 50%;
     }
-    .joystick::after { inset: 42px; }
-    .stick {
-      position: absolute; z-index: 1; left: 50%; top: 50%; width: 49px; height: 49px;
-      margin: -24.5px; border-radius: 50%; border: 1px solid #e0d8ad77;
-      background: linear-gradient(145deg, #b8c878, #718956);
-      box-shadow: 0 5px 14px #101a12aa, inset 0 1px 2px #ffffff70;
-      transform: translate(0, 0); transition: background .16s;
+    .joystick::after { inset: 40px; }
+    .joystick-stick {
+      position: absolute; z-index: 1; left: 50%; top: 50%; width: 47px; height: 47px;
+      margin: -23.5px; border: 1px solid #e0e5e077; border-radius: 50%;
+      background: linear-gradient(145deg, #afb6b2, #626968);
+      box-shadow: 0 5px 14px #0008, inset 0 1px 2px #ffffff66; transform: translate(0, 0);
     }
-    .joystick.active .stick { background: linear-gradient(145deg, #d9df9b, #91a963); transition: none; }
-    .stick-hint { position: absolute; bottom: 12px; left: 0; width: 100%; color: #e8e1bf88; text-align: center; font: 8px "Courier New", monospace; letter-spacing: 1px; }
+    .joystick.active .joystick-stick { background: linear-gradient(145deg, #d0d5d1, #808784); }
+    .joystick-label { position: absolute; bottom: 10px; width: 100%; color: #e1e4df80; text-align: center; font: 8px "Courier New", monospace; letter-spacing: 1px; }
+    .hotbar {
+      position: fixed; z-index: 4; left: 50%; bottom: max(20px, env(safe-area-inset-bottom));
+      display: flex; gap: 5px; transform: translateX(-50%); pointer-events: auto;
+    }
+    .hotbar-slot {
+      position: relative; width: 58px; height: 58px; display: grid; place-items: center;
+      border-radius: 4px; cursor: pointer; transition: background .14s, border-color .14s;
+    }
+    .hotbar-slot.selected { border-color: #eff2edcc; background: #555b5bd9; box-shadow: 0 0 0 1px #d9dfdc33, 0 8px 28px #10131488; }
+    .hotbar-slot .item-icon { font-size: 28px; }
+    .slot-key { position: absolute; top: 4px; left: 6px; color: #aeb4b0; font: 9px "Courier New", monospace; }
+    .slot-empty { color: #b6bcba45; font: 18px "Courier New", monospace; }
+    .attack {
+      position: absolute; right: max(26px, env(safe-area-inset-right)); bottom: max(30px, env(safe-area-inset-bottom));
+      width: 76px; height: 76px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 4px; border-radius: 50%; cursor: pointer; pointer-events: auto; touch-action: none;
+    }
+    .attack:active { transform: scale(.95); background: #626a69e8; }
+    .attack-icon { font-size: 22px; line-height: 1; }
+    .attack-label { color: var(--dim); font: 8px "Courier New", monospace; letter-spacing: .9px; }
+    .toast {
+      position: fixed; z-index: 4; left: 50%; bottom: max(94px, calc(env(safe-area-inset-bottom) + 90px));
+      padding: 8px 12px; border: 1px solid var(--edge); border-radius: 3px;
+      background: #1a1e1fea; color: var(--paper); font: 10px "Courier New", monospace;
+      opacity: 0; transform: translate(-50%, 7px); transition: opacity .14s, transform .14s; pointer-events: none;
+    }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
     @media (max-width: 600px) {
-      .topbar { top: max(12px, env(safe-area-inset-top)); left: 12px; gap: 6px; }
-      .brand { min-width: 0; padding: 10px 12px; }
-      h1 { font-size: 18px; }
-      .readout { min-width: 112px; padding: 9px 10px; }
-      .corner { top: auto; right: 12px; bottom: max(20px, env(safe-area-inset-bottom)); padding: 8px 10px; }
-      .coordinates { font-size: 9px; }
-      .biome { font-size: 13px; }
-      .joystick-wrap { width: 140px; height: 140px; left: 12px; bottom: max(16px, env(safe-area-inset-bottom)); }
-      .joystick { width: 124px; height: 124px; }
-      .bottom-note { display: none; }
+      .corner-count { top: max(11px, env(safe-area-inset-top)); left: 11px; }
+      .inventory-toggle { top: max(8px, env(safe-area-inset-top)); right: 10px; width: 40px; height: 40px; }
+      .joystick-wrap { left: 7px; bottom: max(13px, env(safe-area-inset-bottom)); width: 112px; height: 112px; }
+      .joystick { width: 104px; height: 104px; }
+      .joystick::before { inset: 12px; }
+      .joystick::after { inset: 34px; }
+      .joystick-stick { width: 41px; height: 41px; margin: -20.5px; }
+      .joystick-label { bottom: 7px; }
+      .hotbar { bottom: max(17px, env(safe-area-inset-bottom)); gap: 4px; }
+      .hotbar-slot { width: 50px; height: 50px; }
+      .hotbar-slot .item-icon { font-size: 24px; }
+      .slot-key { top: 3px; left: 5px; }
+      .attack { right: max(12px, env(safe-area-inset-right)); bottom: max(22px, env(safe-area-inset-bottom)); width: 64px; height: 64px; }
+      .attack-icon { font-size: 19px; }
+      .toast { bottom: max(86px, calc(env(safe-area-inset-bottom) + 80px)); }
     }
-    @media (max-width: 370px) {
-      .readout { min-width: auto; }
-      .readout .label { font-size: 8px; }
-      .value { font-size: 11px; }
-      .corner { display: none; }
+    @media (max-width: 355px) {
+      .hotbar-slot { width: 43px; height: 46px; }
+      .joystick-wrap { left: 1px; }
+      .attack { right: 7px; width: 58px; height: 58px; }
     }
   </style>
 </head>
 <body>
-  <canvas id="world" aria-label="Ігровий світ колонії"></canvas>
-  <header class="topbar">
-    <section class="brand"><div class="eyebrow">SECTOR 04 · FRONTIER</div><h1>Північний форпост</h1></section>
-    <section class="readout"><div class="label">Поселенець</div><div class="value"><span class="dot"></span><span id="state">Відпочиває</span></div></section>
-  </header>
-  <aside class="corner"><div class="coordinates" id="coordinates">X 00 · Y 00</div><div class="biome">Зелений рубіж</div></aside>
-  <div class="joystick-wrap"><div class="joystick" id="joystick" role="application" aria-label="Віртуальний джойстик">
-    <div class="stick" id="stick"></div><div class="stick-hint">РУХ</div>
-  </div></div>
-  <div class="bottom-note">WASD / ↑ ↓ ← → &nbsp;·&nbsp; MOVE</div>
-  <script>
-    const canvas = document.querySelector("#world");
-    const context = canvas.getContext("2d");
-    const stateLabel = document.querySelector("#state");
-    const coordinatesLabel = document.querySelector("#coordinates");
-    const joystick = document.querySelector("#joystick");
-    const stick = document.querySelector("#stick");
-    const tileSize = 64;
-    const worldWidth = 2560;
-    const worldHeight = 1792;
-    const pawn = { x: 1280, y: 990, speed: 190, facing: 1, moving: false };
-    const camera = { x: pawn.x, y: pawn.y };
-    const keys = new Set();
-    const axis = { x: 0, y: 0 };
-    const sprites = [
-      "assets/1000005638-removebg-preview.png",
-      "assets/1000005640-removebg-preview.png",
-      "assets/1000005642-removebg-preview.png"
-    ].map((source) => {
-      const image = new Image();
-      image.src = source;
-      return image;
-    });
-    let viewWidth = 0;
-    let viewHeight = 0;
-    let pixelRatio = 1;
-    let previousTime = 0;
-    let lastUiUpdate = 0;
-
-    function resize() {
-      pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-      viewWidth = window.innerWidth;
-      viewHeight = window.innerHeight;
-      canvas.width = Math.round(viewWidth * pixelRatio);
-      canvas.height = Math.round(viewHeight * pixelRatio);
-      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
-    }
-
-    function randomAt(x, y) {
-      const value = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
-      return value - Math.floor(value);
-    }
-
-    function drawGround(left, top, right, bottom) {
-      const firstColumn = Math.floor(left / tileSize);
-      const lastColumn = Math.ceil(right / tileSize);
-      const firstRow = Math.floor(top / tileSize);
-      const lastRow = Math.ceil(bottom / tileSize);
-      for (let row = firstRow; row <= lastRow; row++) {
-        for (let column = firstColumn; column <= lastColumn; column++) {
-          const x = column * tileSize;
-          const y = row * tileSize;
-          const variation = randomAt(column, row);
-          const pathDistance = Math.abs(y - 860) + Math.abs(x - 1270) * .24;
-          const onPath = pathDistance < 112 && variation > .2;
-          context.fillStyle = onPath
-            ? ["#9a895e", "#a19064", "#8f8057"][Math.floor(variation * 3)]
-            : ["#617a48", "#68804b", "#5c7545", "#70834c"][Math.floor(variation * 4)];
-          context.fillRect(x, y, tileSize + 1, tileSize + 1);
-          if (!onPath && variation > .35) {
-            const tuftX = x + 8 + randomAt(column + 3, row) * 46;
-            const tuftY = y + 8 + randomAt(column, row + 5) * 45;
-            context.strokeStyle = variation > .74 ? "#9ca86780" : "#344d3580";
-            context.lineWidth = 1.4;
-            context.beginPath();
-            context.moveTo(tuftX - 3, tuftY + 2);
-            context.lineTo(tuftX, tuftY - 3);
-            context.lineTo(tuftX + 3, tuftY + 2);
-            context.stroke();
-          }
-          context.strokeStyle = "#354e3530";
-          context.strokeRect(x, y, tileSize, tileSize);
-        }
-      }
-    }
-
-    function drawPond() {
-      context.save();
-      context.translate(1800, 510);
-      context.rotate(-.13);
-      context.fillStyle = "#35483a";
-      context.beginPath(); context.ellipse(0, 0, 198, 113, 0, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#668276";
-      context.beginPath(); context.ellipse(0, -5, 180, 96, 0, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#8ea18a66";
-      context.beginPath(); context.ellipse(-27, -29, 105, 25, 0, 0, Math.PI * 2); context.fill();
-      context.restore();
-    }
-
-    function drawTree(x, y, size = 1) {
-      context.fillStyle = "#273c2a88";
-      context.beginPath(); context.ellipse(x + 5, y + 15, 27 * size, 13 * size, 0, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#574b36";
-      context.fillRect(x - 5 * size, y - 3 * size, 10 * size, 22 * size);
-      context.fillStyle = "#405d38";
-      context.beginPath(); context.arc(x, y - 9 * size, 24 * size, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#71874a";
-      context.beginPath(); context.arc(x - 8 * size, y - 15 * size, 16 * size, 0, Math.PI * 2); context.fill();
-      context.fillStyle = "#879453";
-      context.beginPath(); context.arc(x + 8 * size, y - 7 * size, 11 * size, 0, Math.PI * 2); context.fill();
-    }
-
-    function drawCabin() {
-      const x = 1050; const y = 665;
-      context.fillStyle = "#263b2b99"; context.fillRect(x - 8, y + 12, 210, 128);
-      context.fillStyle = "#917252"; context.fillRect(x, y, 194, 119);
-      context.fillStyle = "#b58c61"; context.fillRect(x + 10, y + 9, 174, 100);
-      context.fillStyle = "#72563f"; context.fillRect(x + 25, y + 25, 42, 36);
-      context.fillStyle = "#9eb6a1"; context.fillRect(x + 30, y + 30, 32, 26);
-      context.fillStyle = "#6b503a"; context.fillRect(x + 121, y + 27, 42, 39);
-      context.fillStyle = "#d5bb82"; context.fillRect(x + 126, y + 32, 32, 29);
-      context.fillStyle = "#604835"; context.fillRect(x + 78, y + 65, 39, 54);
-      context.fillStyle = "#3f4534"; context.fillRect(x + 83, y + 70, 29, 49);
-      context.fillStyle = "#806247";
-      context.beginPath(); context.moveTo(x - 14, y + 8); context.lineTo(x + 98, y - 55); context.lineTo(x + 208, y + 8); context.lineTo(x + 194, y + 22); context.lineTo(x + 98, y - 28); context.lineTo(x, y + 22); context.closePath(); context.fill();
-      context.fillStyle = "#bb8a59";
-      context.beginPath(); context.moveTo(x + 5, y + 8); context.lineTo(x + 98, y - 43); context.lineTo(x + 192, y + 8); context.lineTo(x + 184, y + 13); context.lineTo(x + 98, y - 34); context.lineTo(x + 13, y + 13); context.closePath(); context.fill();
-    }
-
-    function drawColony() {
-      drawPond();
-      drawCabin();
-      for (const [x, y, size] of [
-        [760, 580, 1.05], [900, 520, .9], [1510, 500, 1.1], [1630, 630, .82],
-        [1970, 620, 1.1], [2070, 760, .95], [640, 1120, .9], [810, 1260, 1.1],
-        [1800, 1110, 1.15], [1960, 1260, .85], [1420, 1420, 1]
-      ]) drawTree(x, y, size);
-      context.fillStyle = "#796c4d";
-      for (const [x, y] of [[1220, 815], [1250, 807], [1280, 820], [1310, 810]]) {
-        context.fillRect(x, y, 24, 22);
-        context.fillStyle = "#a49368"; context.fillRect(x + 3, y + 3, 18, 4); context.fillStyle = "#796c4d";
-      }
-      context.fillStyle = "#536b3f";
-      context.fillRect(1460, 1060, 190, 114);
-      context.strokeStyle = "#b9b477"; context.lineWidth = 2;
-      for (let i = 0; i < 5; i++) {
-        context.beginPath(); context.moveTo(1470 + i * 38, 1062); context.lineTo(1470 + i * 38, 1172); context.stroke();
-      }
-      context.fillStyle = "#9e9b59";
-      for (let row = 0; row < 3; row++) for (let column = 0; column < 5; column++) {
-        context.beginPath(); context.arc(1480 + column * 37, 1080 + row * 36, 5, 0, Math.PI * 2); context.fill();
-      }
-      context.fillStyle = "#574b3a"; context.fillRect(1404, 797, 49, 34);
-      context.fillStyle = "#a58b5e"; context.fillRect(1410, 803, 37, 22);
-    }
-
-    function drawPawn(timestamp) {
-      const frame = pawn.moving ? Math.floor(timestamp / 145) % sprites.length : 0;
-      const image = sprites[frame];
-      if (!image.complete || !image.naturalWidth) return;
-      const height = 76;
-      const width = height * image.naturalWidth / image.naturalHeight;
-      const bob = pawn.moving ? Math.sin(timestamp / 70) * 2 : 0;
-      context.save();
-      context.translate(pawn.x, pawn.y + bob);
-      context.scale(pawn.facing, 1);
-      context.fillStyle = "#293b2b77";
-      context.beginPath(); context.ellipse(0, 2, 14, 5, 0, 0, Math.PI * 2); context.fill();
-      context.drawImage(image, -width / 2, -height + 8, width, height);
-      context.restore();
-    }
-
-    function render(timestamp) {
-      const delta = Math.min((timestamp - previousTime) / 1000 || 0, .04);
-      previousTime = timestamp;
-      const horizontal = axis.x + (keys.has("ArrowRight") || keys.has("d") ? 1 : 0) - (keys.has("ArrowLeft") || keys.has("a") ? 1 : 0);
-      const vertical = axis.y + (keys.has("ArrowDown") || keys.has("s") ? 1 : 0) - (keys.has("ArrowUp") || keys.has("w") ? 1 : 0);
-      const magnitude = Math.hypot(horizontal, vertical);
-      pawn.moving = magnitude > .08;
-      if (pawn.moving) {
-        const normalizer = Math.max(1, magnitude);
-        pawn.x = Math.max(28, Math.min(worldWidth - 28, pawn.x + horizontal / normalizer * pawn.speed * delta));
-        pawn.y = Math.max(48, Math.min(worldHeight - 20, pawn.y + vertical / normalizer * pawn.speed * delta));
-        if (Math.abs(horizontal) > .08) pawn.facing = horizontal < 0 ? -1 : 1;
-      }
-
-      const cameraTargetX = Math.max(viewWidth / 2, Math.min(worldWidth - viewWidth / 2, pawn.x));
-      const cameraTargetY = Math.max(viewHeight / 2, Math.min(worldHeight - viewHeight / 2, pawn.y));
-      camera.x += (cameraTargetX - camera.x) * Math.min(1, delta * 5);
-      camera.y += (cameraTargetY - camera.y) * Math.min(1, delta * 5);
-      context.clearRect(0, 0, viewWidth, viewHeight);
-      context.save();
-      context.translate(viewWidth / 2 - camera.x, viewHeight / 2 - camera.y);
-      context.beginPath();
-      context.rect(0, 0, worldWidth, worldHeight);
-      context.clip();
-      drawGround(camera.x - viewWidth / 2, camera.y - viewHeight / 2, camera.x + viewWidth / 2, camera.y + viewHeight / 2);
-      drawColony();
-      drawPawn(timestamp);
-      context.restore();
-
-      if (timestamp - lastUiUpdate > 100) {
-        stateLabel.textContent = pawn.moving ? "На ногах" : "Відпочиває";
-        coordinatesLabel.textContent = `X ${String(Math.round(pawn.x / tileSize)).padStart(2, "0")} · Y ${String(Math.round(pawn.y / tileSize)).padStart(2, "0")}`;
-        lastUiUpdate = timestamp;
-      }
-      requestAnimationFrame(render);
-    }
-
-    window.addEventListener("resize", resize);
-    window.addEventListener("keydown", (event) => {
-      const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-      if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(key)) event.preventDefault();
-      keys.add(key);
-    });
-    window.addEventListener("keyup", (event) => keys.delete(event.key.length === 1 ? event.key.toLowerCase() : event.key));
-    window.addEventListener("blur", () => { keys.clear(); axis.x = 0; axis.y = 0; stick.style.transform = "translate(0px, 0px)"; joystick.classList.remove("active"); });
-
-    let pointerId = null;
-    function updateJoystick(event) {
-      const bounds = joystick.getBoundingClientRect();
-      const centerX = bounds.left + bounds.width / 2;
-      const centerY = bounds.top + bounds.height / 2;
-      const radius = bounds.width * .34;
-      const offsetX = event.clientX - centerX;
-      const offsetY = event.clientY - centerY;
-      const distance = Math.hypot(offsetX, offsetY);
-      const scale = distance > radius ? radius / distance : 1;
-      const x = offsetX * scale;
-      const y = offsetY * scale;
-      axis.x = x / radius;
-      axis.y = y / radius;
-      stick.style.transform = `translate(${x}px, ${y}px)`;
-    }
-    joystick.addEventListener("pointerdown", (event) => {
-      pointerId = event.pointerId;
-      joystick.setPointerCapture(pointerId);
-      joystick.classList.add("active");
-      updateJoystick(event);
-    });
-    joystick.addEventListener("pointermove", (event) => { if (event.pointerId === pointerId) updateJoystick(event); });
-    function releaseJoystick(event) {
-      if (event.pointerId !== pointerId) return;
-      pointerId = null;
-      axis.x = 0; axis.y = 0;
-      stick.style.transform = "translate(0px, 0px)";
-      joystick.classList.remove("active");
-    }
-    joystick.addEventListener("pointerup", releaseJoystick);
-    joystick.addEventListener("pointercancel", releaseJoystick);
-
-    resize();
-    requestAnimationFrame(render);
-  </script>
+  <canvas id="world" aria-label="Процедурний ігровий світ"></canvas>
+  <canvas id="effects" aria-hidden="true"></canvas>
+  <div id="fog-fallback" aria-hidden="true"></div>
+  <div class="corner-count" aria-live="polite">ЗОМБІ <strong id="zombie-count">00</strong></div>
+  <button id="inventory-toggle" class="inventory-toggle" type="button" title="Інвентар" aria-label="Відкрити інвентар" aria-expanded="false" aria-controls="inventory">▤</button>
+  <section id="inventory" class="inventory" role="dialog" aria-label="Інвентар гравця" hidden>
+    <header class="inventory-head"><span class="inventory-title">ІНВЕНТАР</span><button id="inventory-close" class="inventory-close" type="button" aria-label="Закрити інвентар">×</button></header>
+    <div class="inventory-grid">
+      <button class="inventory-slot selected" type="button" aria-label="Меч"><span class="item-icon">⚔</span></button>
+      <button class="inventory-slot" type="button" aria-label="Порожній слот"><span class="inventory-empty">·</span></button>
+      <button class="inventory-slot" type="button" aria-label="Порожній слот"><span class="inventory-empty">·</span></button>
+      <button class="inventory-slot" type="button" aria-label="Порожній слот"><span class="inventory-empty">·</span></button>
+      <button class="inventory-slot" type="button" aria-label="Порожній слот"><span class="inventory-empty">·</span></button>
+      <button class="inventory-slot" type="button" aria-label="Порожній слот"><span class="inventory-empty">·</span></button>
+      <button class="inventory-slot" type="button" aria-label="Порожній слот"><span class="inventory-empty">·</span></button>
+      <button class="inventory-slot" type="button" aria-label="Порожній слот"><span class="inventory-empty">·</span></button>
+      <button class="inventory-slot" type="button" aria-label="Порожній слот"><span class="inventory-empty">·</span></button>
+    </div>
+    <footer class="inventory-foot">МЕЧ · 3 ВЛУЧАННЯ ДО ЗНИЩЕННЯ</footer>
+  </section>
+  <div class="controls">
+    <div class="joystick-wrap"><div id="joystick" class="joystick" role="application" aria-label="Джойстик руху">
+      <div id="joystick-stick" class="joystick-stick"></div><div class="joystick-label">РУХ</div>
+    </div></div>
+    <div class="hotbar" role="toolbar" aria-label="Хотбар">
+      <button class="hotbar-slot selected" type="button" aria-label="Слот 1: меч"><span class="slot-key">1</span><span class="item-icon">⚔</span></button>
+      <button class="hotbar-slot" type="button" aria-label="Слот 2: порожньо"><span class="slot-key">2</span><span class="slot-empty">·</span></button>
+      <button class="hotbar-slot" type="button" aria-label="Слот 3: порожньо"><span class="slot-key">3</span><span class="slot-empty">·</span></button>
+    </div>
+    <button id="attack" class="attack" type="button" aria-label="Ударити мечем">
+      <span class="attack-icon">⚔</span><span class="attack-label">УДАР</span>
+    </button>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="game.js"></script>
 </body>
 </html>
